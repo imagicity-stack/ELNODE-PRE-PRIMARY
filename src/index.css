@@ -1,0 +1,272 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  *, *::before, *::after {
+    scrollbar-width: thin;
+    scrollbar-color: #e2e8f0 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 20px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  input, select, textarea {
+    font-size: 14px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .gradient-indigo {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+  }
+
+  .gradient-blue {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+  }
+
+  .gradient-emerald {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+
+  .gradient-violet {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  }
+
+  .gradient-amber {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+  }
+
+  .gradient-rose {
+    background: linear-gradient(135deg, #f43f5e, #e11d48);
+  }
+
+  .gradient-sky {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  }
+
+  .gradient-slate {
+    background: linear-gradient(135deg, #64748b, #475569);
+  }
+
+  .sidebar-item-active {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .text-gradient-indigo {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Elden Heights design system — scoped under .eh-app so it never leaks into the
+   portals that still use the legacy Tailwind look. Ported from the Claude
+   Design handoff (Bricolage Grotesque / DM Sans / cream + ink + chartreuse).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.eh-app {
+  --ink: #0E0F11;
+  --ink-2: #2B2C30;
+  --ink-3: #5B5D63;
+  --ink-4: #8A8D94;
+  --line: #E5E1D6;
+  --line-2: #EFEBDF;
+  --cream: #F5F2EC;
+  --cream-2: #ECE7D9;
+  --paper: #FFFFFF;
+
+  --accent: oklch(0.86 0.18 105);     /* chartreuse */
+  --accent-ink: #0E0F11;
+  --coral: oklch(0.68 0.18 30);
+  --sky: oklch(0.72 0.13 230);
+  --rose: oklch(0.74 0.14 0);
+  --leaf: oklch(0.55 0.13 145);
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-l: 22px;
+
+  --display: 'Bricolage Grotesque', 'Times New Roman', serif;
+  --body: 'DM Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --pad: 18px;
+
+  font-family: var(--body);
+  color: var(--ink);
+}
+.eh-app * { box-sizing: border-box; }
+
+/* Typography helpers */
+.eh-app .display { font-family: var(--display); letter-spacing: -0.02em; line-height: 1; font-weight: 700; }
+.eh-app .eyebrow {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+}
+.eh-app .t-num { font-family: var(--display); font-weight: 700; letter-spacing: -0.04em; }
+.eh-app .muted { color: var(--ink-3); }
+.eh-app .ink2 { color: var(--ink-2); }
+.eh-app .tiny { font-size: 11px; }
+.eh-app .small { font-size: 12px; }
+.eh-app .bold { font-weight: 700; }
+.eh-app .mono { font-family: var(--mono); }
+.eh-app .upper { text-transform: uppercase; letter-spacing: 0.14em; }
+
+/* Cards */
+.eh-app .card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius-m); padding: 16px;
+}
+.eh-app .card.flush { padding: 0; overflow: hidden; }
+.eh-app .card.inked { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.eh-app .card.accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+/* Chips */
+.eh-app .chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: 999px; background: var(--paper); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 500; color: var(--ink-2); cursor: pointer; white-space: nowrap;
+}
+.eh-app .chip.solid { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.eh-app .chip.accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+/* Buttons */
+.eh-app .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 18px; border-radius: 12px; background: var(--ink); color: var(--cream);
+  border: 0; font-family: var(--body); font-weight: 600; font-size: 15px; cursor: pointer; width: 100%;
+}
+.eh-app .btn.accent { background: var(--accent); color: var(--accent-ink); }
+.eh-app .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+
+/* Lists */
+.eh-app .row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line-2); }
+.eh-app .row:last-child { border-bottom: 0; }
+
+/* Section heading */
+.eh-app .section-head { display: flex; align-items: baseline; justify-content: space-between; padding: 18px var(--pad) 10px; }
+.eh-app .section-head h2 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0; letter-spacing: -0.02em; }
+.eh-app .section-head a { font-size: 12px; color: var(--ink-3); text-decoration: none; cursor: pointer; }
+
+.eh-app .stack > * + * { margin-top: 12px; }
+.eh-app .pad { padding: 0 var(--pad); }
+
+/* Layout utilities (mirrors the design prototype's helpers) */
+.eh-app .flex { display: flex; }
+.eh-app .between { justify-content: space-between; }
+.eh-app .center { align-items: center; }
+.eh-app .gap-8 { gap: 8px; }
+.eh-app .gap-12 { gap: 12px; }
+.eh-app .gap-16 { gap: 16px; }
+
+/* Progress bar */
+.eh-app .bar { height: 6px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.eh-app .bar > i { display: block; height: 100%; background: var(--ink); }
+
+/* Top bar */
+.eh-app .topbar {
+  padding: 12px var(--pad) 8px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; background: var(--cream);
+  position: sticky; top: 0; z-index: 5;
+}
+.eh-app .topbar h1 { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: -0.03em; margin: 0; line-height: 1.05; }
+
+.eh-app .avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: var(--cream);
+  display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 14px; flex-shrink: 0;
+}
+.eh-app .icon-btn {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); display: grid; place-items: center; cursor: pointer; position: relative;
+}
+
+/* Calendar day pills */
+.eh-app .dpill {
+  width: 44px; min-width: 44px; padding: 8px 0 10px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--paper); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;
+}
+.eh-app .dpill .wd { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
+.eh-app .dpill .dn { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
+.eh-app .dpill.on { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.eh-app .dpill.on .wd { color: var(--cream); opacity: 0.7; }
+.eh-app .dpill.today { border-color: var(--ink); }
+
+/* Horizontal scroller */
+.eh-app .hscroll { display: flex; gap: 10px; overflow-x: auto; padding: 0 var(--pad) 4px; scrollbar-width: none; }
+.eh-app .hscroll::-webkit-scrollbar { display: none; }
+
+.eh-app .divider { height: 1px; background: var(--line-2); margin: 0 var(--pad); }
+
+/* Bottom tab bar (mobile) */
+.eh-app .tabbar {
+  display: flex; background: var(--paper); border-top: 1px solid var(--line);
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); gap: 2px;
+}
+.eh-app .tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 6px 2px; cursor: pointer; color: var(--ink-4); font-size: 10px; font-weight: 500;
+  font-family: var(--body); border-radius: 12px; background: transparent; border: 0; transition: color .15s;
+}
+.eh-app .tab.active { color: var(--ink); }
+.eh-app .tab .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--ink); opacity: 0; margin-top: 1px; }
+.eh-app .tab.active .dot { opacity: 1; }
+/* Bottom bar + mobile-only affordances; these beat Tailwind's lg:hidden,
+   which loses to .eh-app's two-class component selectors on specificity. */
+@media (min-width: 1024px) {
+  .eh-app .tabbar { display: none; }
+  .eh-app .mobile-only { display: none !important; }
+}
+
+@keyframes eh-spin { to { transform: rotate(360deg); } }
+.eh-app .spin { animation: eh-spin 0.9s linear infinite; }
+
+@keyframes eh-slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.eh-app .more-sheet { animation: eh-slideup 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+@keyframes eh-slidein { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.eh-app .profile-drawer { animation: eh-slidein 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+.eh-app .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 640px) { .eh-app .form-grid { grid-template-columns: 1fr; } }
+.eh-app .section-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--cream-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.eh-app .profile-completion-bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.eh-app .profile-completion-fill { height: 100%; border-radius: 99px; transition: width 0.5s ease; }
