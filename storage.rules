@@ -1,0 +1,131 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(roles) {
+      return isSignedIn() &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+             firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '') in roles;
+    }
+
+    function isAdmin() {
+      return hasRole(['super_admin', 'admin', 'office_staff']);
+    }
+
+    function isAnyAdmin() {
+      return hasRole(['super_admin', 'admin', 'office_staff', 'principal']);
+    }
+
+    function isTeacher() { return hasRole(['teacher']); }
+
+    // File size limit: 10 MB
+    function isValidFileSize() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // Only allow common document and image types
+    function isAllowedContentType() {
+      return request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*') ||
+             request.resource.contentType.matches('text/plain');
+    }
+
+    // Profile pictures — users can manage their own; admins can manage all
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() &&
+                      isValidFileSize() &&
+                      isAllowedContentType() &&
+                      (request.auth.uid == userId || isAnyAdmin());
+    }
+
+    // Exam syllabi — admin and teachers can write; all authenticated can read
+    match /exams/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType() && (isAnyAdmin() || isTeacher());
+    }
+
+    // Homework files — teachers can write; all authenticated can read
+    match /homework/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType() && isTeacher();
+    }
+
+    // Study materials — teachers and admins can write; all authenticated can read
+    match /studyMaterials/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType() && (isAnyAdmin() || isTeacher());
+    }
+
+    // Lesson files (classwork/homework attachments)
+    match /lessons/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType() && (isAnyAdmin() || isTeacher());
+    }
+
+    // Leave documents — parent who owns the leave can write; admins/teachers can read
+    match /leaveDocuments/{userId}/{allPaths=**} {
+      allow read: if isSignedIn() && (isAnyAdmin() || isTeacher() || request.auth.uid == userId);
+      allow write: if isSignedIn() &&
+                      isValidFileSize() &&
+                      isAllowedContentType() &&
+                      request.auth.uid == userId;
+    }
+
+    // Leave documents (parent portal upload path). Parent uploads when admin
+    // sets a leave to 'document_required'. Anyone signed in can read so that
+    // teachers/admins can view the supporting document inline.
+    match /leave_documents/{leaveId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType();
+    }
+
+    // Cash voucher photos — accountants/admins upload; finance roles can read.
+    match /fee_vouchers/{studentId}/{allPaths=**} {
+      allow read: if isSignedIn() && (isAnyAdmin() || hasRole(['accounts', 'grievance_officer']));
+      allow write: if isSignedIn() &&
+                      isValidFileSize() &&
+                      isAllowedContentType() &&
+                      (isAnyAdmin() || hasRole(['accounts']));
+    }
+
+    // Notice attachments — admins/principal upload; all authenticated can read
+    match /notices/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isValidFileSize() && isAllowedContentType() && isAnyAdmin();
+    }
+
+    // True when the signed-in user is linked to this student (own student doc,
+    // or a parent whose studentIds contains it). Guarded with exists() so a
+    // missing user doc returns false instead of throwing (which would deny).
+    function isLinkedToStudent(studentId) {
+      return isSignedIn() &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) && (
+               firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('studentId', '') == studentId ||
+               studentId in firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('studentIds', [])
+             );
+    }
+
+    // Student profile photos — ID card front/back uploaded by student or admin
+    match /studentProfiles/{studentId}/{allPaths=**} {
+      // Admins, the student themselves, or a linked parent/student can read
+      allow read: if isSignedIn() && (isAnyAdmin() || request.auth.uid == studentId || isLinkedToStudent(studentId));
+      // Admin, the student themselves, or a linked student/parent can write
+      allow write: if isSignedIn() &&
+                      isValidFileSize() &&
+                      isAllowedContentType() &&
+                      (isAnyAdmin() || request.auth.uid == studentId || isLinkedToStudent(studentId));
+    }
+
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

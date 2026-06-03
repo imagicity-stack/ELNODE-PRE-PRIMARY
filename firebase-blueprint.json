@@ -1,0 +1,636 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information and role-based access data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "name": { "type": "string", "description": "User's full name." },
+        "role": { "type": "string", "enum": ["super_admin", "student", "parent", "accounts", "teacher", "principal"], "description": "User's role in the system." },
+        "schoolNumber": { "type": "string", "description": "7-digit school number for students and parents." },
+        "classId": { "type": "string", "description": "Reference to the class ID for students." },
+        "section": { "type": "string", "description": "Section for students." },
+        "parentId": { "type": "string", "description": "Reference to the parent's user ID for students." },
+        "studentId": { "type": "string", "description": "Reference to the student's user ID for parents." },
+        "studentIds": { "type": "array", "items": { "type": "string" }, "description": "Array of student IDs for parents." },
+        "photoURL": { "type": "string", "description": "URL to the user's profile photo." },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role", "createdAt"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Detailed student information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "admissionNumber": { "type": "string" },
+        "schoolNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "classId": { "type": "string" },
+        "section": { "type": "string" },
+        "parentId": { "type": "string" },
+        "parentDetails": {
+          "type": "object",
+          "properties": {
+            "fatherName": { "type": "string" },
+            "motherName": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string" }
+          }
+        },
+        "transportDetails": { "type": "string" },
+        "documents": { "type": "array", "items": { "type": "string" } },
+        "medicalNotes": { "type": "string" },
+        "academicHistory": { "type": "string" },
+        "houseId": { "type": "string" },
+        "feeStatus": { "type": "string", "enum": ["paid", "pending", "overdue"] }
+      }
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Teacher profile and assignment details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "classes": { "type": "array", "items": { "type": "string" } },
+        "salaryStructure": { "type": "number" },
+        "joiningDetails": { "type": "string" },
+        "houseInchargeId": { "type": "string" },
+        "isHouseIncharge": { "type": "boolean" },
+        "classTeacherOf": {
+          "type": "object",
+          "properties": {
+            "classId": { "type": "string" },
+            "section": { "type": "string" }
+          }
+        }
+      }
+    },
+    "Class": {
+      "title": "Class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "capacity": { "type": "number" },
+              "classTeacherId": { "type": "string" }
+            }
+          }
+        },
+        "subjects": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Subject": {
+      "title": "Subject",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["theory", "practical", "both"] },
+        "teacherId": { "type": "string" }
+      }
+    },
+    "House": {
+      "title": "House",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "teacherInchargeId": { "type": "string" }
+      }
+    },
+    "Timetable": {
+      "title": "Timetable",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": { "type": "string" },
+              "periods": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "time": { "type": "string" },
+                    "subjectId": { "type": "string" },
+                    "teacherId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "studentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] },
+        "type": { "type": "string", "enum": ["student", "staff"] }
+      }
+    },
+    "Homework": {
+      "title": "Homework",
+      "description": "Homework assignments and submissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "content": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "submissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "studentId": { "type": "string" },
+              "content": { "type": "string" },
+              "submittedAt": { "type": "string", "format": "date-time" },
+              "remarks": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Examination schedule and details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "term": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "classIds": { "type": "array", "items": { "type": "string" } },
+        "subjectId": { "type": "string" },
+        "maxMarks": { "type": "number" },
+        "gradingScaleId": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "ongoing", "completed", "published"] },
+        "type": { "type": "string", "enum": ["scheduled", "surprise"] },
+        "topic": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      }
+    },
+    "ExamResult": {
+      "title": "Exam Result",
+      "description": "Individual student results for an exam.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "examId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subjectId": { "type": "string" },
+              "marksObtained": { "type": "number" },
+              "maxMarks": { "type": "number" },
+              "grade": { "type": "string" },
+              "remarks": { "type": "string" }
+            }
+          }
+        },
+        "totalMarks": { "type": "number" },
+        "percentage": { "type": "number" },
+        "overallGrade": { "type": "string" },
+        "published": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "GradingScale": {
+      "title": "Grading Scale",
+      "description": "Defines grading ranges and GPA mapping.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "grade": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "point": { "type": "number" },
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "School-wide announcements.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "targetRoles": { "type": "array", "items": { "type": "string" } },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date" }
+      }
+    },
+    "SchoolEvent": {
+      "title": "School Event",
+      "description": "Academic calendar events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["holiday", "exam", "event", "meeting"] },
+        "allDay": { "type": "boolean" },
+        "location": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    },
+    "FineConfig": {
+      "title": "Fine Configuration",
+      "description": "Rules for late payment penalties.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "isEnabled": { "type": "boolean" },
+        "gracePeriodDays": { "type": "number" },
+        "slabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "startDay": { "type": "number" },
+              "endDay": { "type": "number" },
+              "fixedPenalty": { "type": "number" },
+              "percentagePenalty": { "type": "number" },
+              "isHigherOf": { "type": "boolean" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "FeeRequest": {
+      "title": "Fee Request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "month": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "fineAmount": { "type": "number" },
+        "waivedAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["paid", "pending", "partially_paid", "overdue"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "waivedBy": { "type": "string" },
+        "waivedAt": { "type": "string", "format": "date-time" },
+        "waiverReason": { "type": "string" }
+      }
+    },
+    "FeePayment": {
+      "title": "Fee Payment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "feeRequestId": { "type": "string" },
+        "feeHead": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "method": { "type": "string" },
+        "receiptNumber": { "type": "string" },
+        "transactionId": { "type": "string", "description": "Online payment transaction ID" },
+        "classId": { "type": "string", "description": "Cached class ID for filtering" },
+        "referenceNumber": { "type": "string" },
+        "remarks": { "type": "string" }
+      }
+    },
+    "LessonLog": {
+      "title": "Lesson Log",
+      "description": "Records what was taught in a class and what homework was given.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "slotId": { "type": "string" },
+        "topic": { "type": "string" },
+        "classwork": { "type": "string" },
+        "classworkFileUrl": { "type": "string" },
+        "classworkFileName": { "type": "string" },
+        "homework": { "type": "string" },
+        "homeworkFileUrl": { "type": "string" },
+        "homeworkFileName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Expense": {
+      "title": "Expense",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "biller": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["paid", "pending"] }
+      }
+    },
+    "Salary": {
+      "title": "Salary Record",
+      "description": "Monthly salary disbursement details for both teachers and other staff.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "employeeRole": { "type": "string" },
+        "month": { "type": "string", "description": "YYYY-MM format" },
+        "baseAmount": { "type": "number" },
+        "allowances": { "type": "number" },
+        "deductions": {
+          "type": "object",
+          "properties": {
+            "pf": { "type": "number" },
+            "tax": { "type": "number" },
+            "leaves": { "type": "number" },
+            "leaveDeduction": { "type": "number" },
+            "other": { "type": "number" }
+          }
+        },
+        "netAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "balanceAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "partially_paid", "paid"] },
+        "remarks": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "TimetableConfig": {
+      "title": "Timetable Configuration",
+      "description": "Global timetable settings like slots and working days.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "days": { "type": "array", "items": { "type": "string" } },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "startTime": { "type": "string" },
+              "endTime": { "type": "string" },
+              "type": { "type": "string", "enum": ["period", "break", "lunch"] }
+            }
+          }
+        }
+      }
+    },
+    "StudyMaterial": {
+      "title": "Study Material",
+      "description": "Study materials shared by teachers with students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "classId": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "PayrollConfig": {
+      "title": "Payroll Configuration",
+      "description": "Global settings for salary calculations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workingDaysInYear": { "type": "number", "description": "Total working days in a year (e.g., 240) for leave calculation" },
+        "leaveDeductionPerDay": { "type": "number", "description": "Fixed override amount to deduct per day of leave (optional)" },
+        "pfRate": { "type": "number" },
+        "professionalTax": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "StudentLeaveRequest": {
+      "title": "Student Leave Request",
+      "description": "Leave applications submitted by parents for students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "parentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "classId": { "type": "string" },
+        "section": { "type": "string" },
+        "leaveType": { "type": "string", "enum": ["planned", "medical", "emergency", "half_day", "regularization"] },
+        "reasonCategory": { "type": "string", "enum": ["Medical", "Family Function", "Travel", "Emergency", "Religious Reason", "Personal Reason", "Exam-related", "Other"] },
+        "reason": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "totalDays": { "type": "number" },
+        "documentUrl": { "type": "string" },
+        "isEmergency": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["submitted", "pending", "approved", "rejected", "document_required", "regularized", "unregularized", "cancelled"] },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Staff": {
+      "title": "Staff Member",
+      "description": "General staff member details (non-faculty).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["principal", "accounts", "admin", "security", "transport"] },
+        "joiningDate": { "type": "string", "format": "date" },
+        "salary": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "on-leave", "resigned"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "joiningDate", "salary", "status"]
+    },
+    "RolePermissions": {
+      "title": "Role Permissions",
+      "description": "Dynamic module access control and read-only settings for specific roles.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The role name (e.g., 'principal')" },
+        "modules": {
+          "type": "object",
+          "description": "Map of module IDs to their permission settings",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "readOnly": { "type": "boolean" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Detailed student information."
+    },
+    "/teachers/{teacherId}": {
+      "schema": "Teacher",
+      "description": "Teacher profile and assignment details."
+    },
+    "/staff/{staffId}": {
+      "schema": "Staff",
+      "description": "General staff member details."
+    },
+    "/payroll-config/{configId}": {
+      "schema": "PayrollConfig",
+      "description": "Global payroll settings."
+    },
+    "/fine-config/{configId}": {
+      "schema": "FineConfig",
+      "description": "Global fine/penalty settings."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Attendance records."
+    },
+    "/homework/{homeworkId}": {
+      "schema": "Homework",
+      "description": "Homework assignments."
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "Examination schedule."
+    },
+    "/examResults/{resultId}": {
+      "schema": "ExamResult",
+      "description": "Student exam results."
+    },
+    "/gradingScales/{scaleId}": {
+      "schema": "GradingScale",
+      "description": "Grading scale definitions."
+    },
+    "/notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "School announcements."
+    },
+    "/events/{eventId}": {
+      "schema": "SchoolEvent",
+      "description": "Academic calendar events."
+    },
+    "/feeRequests/{requestId}": {
+      "schema": "FeeRequest",
+      "description": "Fee requests/invoices."
+    },
+    "/feePayments/{paymentId}": {
+      "schema": "FeePayment",
+      "description": "Fee payment records."
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "School expenses."
+    },
+    "/salaries/{salaryId}": {
+      "schema": "Salary",
+      "description": "Staff salary records."
+    },
+    "/classes/{classId}": {
+      "schema": "Class",
+      "description": "Class information."
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Subject information."
+    },
+    "/houses/{houseId}": {
+      "schema": "House",
+      "description": "House information."
+    },
+    "/timetable/{timetableId}": {
+      "schema": "Timetable",
+      "description": "Timetable information."
+    },
+    "/timetableSettings/{id}": {
+      "schema": "TimetableConfig",
+      "description": "Global timetable settings."
+    },
+    "/studyMaterials/{id}": {
+      "schema": "StudyMaterial",
+      "description": "Study materials shared by teachers."
+    },
+    "/studentLeaves/{leaveId}": {
+      "schema": "StudentLeaveRequest",
+      "description": "Student leave applications."
+    },
+    "/lessonLogs/{id}": {
+      "schema": "LessonLog",
+      "description": "Records of lessons taught and homework assigned."
+    },
+    "/rolePermissions/{roleId}": {
+      "schema": "RolePermissions",
+      "description": "Module-level permissions for specific user roles."
+    }
+  }
+}
+

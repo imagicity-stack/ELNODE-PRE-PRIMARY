@@ -1,0 +1,580 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(roles) {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in roles;
+    }
+
+    function isSuperAdminByEmail() {
+      return isSignedIn() && (
+        request.auth.uid in ["Sev825sC9HSFIBUlYN3SGIWHMss1", "8uTs7freEPaiVtywgpg5G9in4JF2", "ldnsKSufIyOLFiyPhdmmIErNi7P2"]
+      );
+    }
+
+    function isAdmin() {
+      return isSuperAdminByEmail() || hasRole(['super_admin', 'admin', 'office_staff']);
+    }
+
+    function isAcademicAdmin() {
+      return hasRole(['principal', 'office_staff']);
+    }
+
+    function isAnyAdmin() {
+      return isAdmin() || isAcademicAdmin();
+    }
+
+    function isTeacher() { return hasRole(['teacher']); }
+    function isStudent() { return hasRole(['student']); }
+    function isParent() { return hasRole(['parent']); }
+    function isAccountant() { return hasRole(['accounts']); }
+    function isPrincipal() { return hasRole(['principal']); }
+    function isOfficeStaff() { return hasRole(['office_staff']); }
+    function isGrievanceOfficer() { return hasRole(['grievance_officer']); }
+
+    function isLinkedToStudent(studentId) {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('studentId', '') == studentId ||
+               studentId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('studentIds', [])
+             );
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAnyAdmin());
+      // Allow any signed-in user to do a limit-1 query by their own email so the
+      // UID-mismatch recovery path in App.tsx (email fallback lookup) works even
+      // before the user's role doc exists (e.g. first Google OAuth login).
+      allow list: if isAnyAdmin() || (
+        isSignedIn() &&
+        request.query.limit <= 1 &&
+        resource.data.email == request.auth.token.email
+      );
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAnyAdmin());
+
+      // Users can update their own profile but CANNOT change role, studentId, or studentIds.
+      // Only admins can change privileged fields.
+      allow update: if isSignedIn() && (
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.get('studentId', '') == resource.data.get('studentId', '') &&
+          request.resource.data.get('studentIds', []) == resource.data.get('studentIds', [])
+        ) ||
+        isAnyAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Academic Data - readable by all authenticated school members
+    match /classes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+    match /subjects/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+    match /houses/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+    match /timetable/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+    match /timetableSettings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+
+    // Notices
+    match /notices/{noticeId} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+
+    // Students — list is restricted; students/parents should not enumerate the full roster
+    match /students/{studentId} {
+      allow get: if isSignedIn() && (
+        isAnyAdmin() || isTeacher() || isAccountant() || isGrievanceOfficer() ||
+        isLinkedToStudent(studentId)
+      );
+      allow list: if isAnyAdmin() || isTeacher() || isAccountant() || isGrievanceOfficer();
+      allow create: if isSignedIn() && (isAnyAdmin() || isAccountant());
+      allow update: if isSignedIn() && (isAnyAdmin() || isAccountant() || isGrievanceOfficer() || (
+        isLinkedToStudent(studentId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['feeStatus', 'updatedAt', 'fcmTokens', 'lastLogin', 'photoURL'])
+      ));
+      allow delete: if isAdmin();
+    }
+
+    // Teachers — readable by school staff and students (needed for timetable display)
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn();
+      allow create: if isAnyAdmin()
+                    && request.resource.data.get('version', 0) == 1;
+      // Admins may update any field freely (no version check — they have full control and
+      // may write partial updates such as houseInchargeId sync from HouseManagement).
+      // Teachers may only self-edit safe profile fields and must bump version for optimistic concurrency.
+      allow update: if isAnyAdmin() ||
+                    (
+                      isTeacher() &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('teacherId', '') == teacherId &&
+                      request.resource.data.get('version', 1) == resource.data.get('version', 0) + 1 &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['name', 'phone', 'photoURL', 'version', 'updatedAt'])
+                    );
+      allow delete: if isAnyAdmin();
+    }
+
+    // Staff
+    match /staff/{staffId} {
+      allow read: if isAnyAdmin() || isTeacher() || isAccountant();
+      allow create: if isAnyAdmin()
+                    && request.resource.data.get('version', 0) == 1;
+      allow update: if isAnyAdmin()
+                    && request.resource.data.get('version', 1)
+                       == resource.data.get('version', 0) + 1;
+      allow delete: if isAnyAdmin();
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow get: if isSignedIn() && (
+        isAnyAdmin() || isTeacher() ||
+        isLinkedToStudent(resource.data.get('studentId', ''))
+      );
+      allow list: if isAnyAdmin() || isTeacher() || isParent() || isStudent();
+      allow create, update: if isSignedIn() && (isAnyAdmin() || isTeacher());
+      allow delete: if isAnyAdmin();
+    }
+
+    // Exam Results
+    // Read: admins/teachers full; students see their own ONLY when published; parents see their
+    // children's ONLY when published. The `published` gate enforces the publication workflow at
+    // the database level — no client mistake can leak unpublished drafts.
+    match /examResults/{resultId} {
+      allow get: if isSignedIn() && (
+        isAnyAdmin() || isTeacher() ||
+        (isLinkedToStudent(resource.data.get('studentId', '')) && resource.data.get('published', false) == true)
+      );
+      allow list: if isAnyAdmin() || isTeacher() || isParent() || isStudent();
+      // Writes: admins or teachers. Optimistic concurrency — `version` must strictly increment.
+      allow create: if isSignedIn() && (isAnyAdmin() || isTeacher())
+                    && request.resource.data.get('version', 1) == 1;
+      allow update: if isSignedIn() && (isAnyAdmin() || isTeacher())
+                    && request.resource.data.studentId == resource.data.studentId
+                    && request.resource.data.examId == resource.data.examId
+                    && request.resource.data.get('version', 1) == resource.data.get('version', 0) + 1;
+      allow delete: if isSignedIn() && isAnyAdmin();
+    }
+
+    // Homework
+    match /homework/{homeworkId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isSignedIn() && (isAnyAdmin() || isTeacher());
+      // Teachers/admins can update anything; students may only append to submissions array
+      allow update: if isSignedIn() && (
+        isAnyAdmin() || isTeacher() || (
+          isStudent() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissions'])
+        )
+      );
+    }
+
+    // Events
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isAnyAdmin();
+    }
+
+    // DEPRECATED — legacy per-student fee collection. No longer written by the app;
+    // superseded by `feeStructures` (per-class heads), `feeRequests` (invoices) and
+    // `feePayments` (payments). Only referenced in the student-deletion cleanup list.
+    // Rules retained so that cleanup can still delete any historical docs. Do not
+    // build new features on this collection — remove once historical data is purged.
+    match /fees/{feeId} {
+      allow read: if isAdmin() || isAccountant() || isParent() || isStudent();
+      allow write: if isAdmin() || isAccountant();
+    }
+
+    match /feePayments/{paymentId} {
+      allow get: if isSignedIn() && (
+        isAdmin() || isAccountant() || isGrievanceOfficer() ||
+        isLinkedToStudent(resource.data.get('studentId', ''))
+      );
+      allow list: if isAdmin() || isAccountant() || isGrievanceOfficer() || isParent() || isStudent();
+      allow create: if isSignedIn() && (isAdmin() || isAccountant() || (
+        isLinkedToStudent(request.resource.data.studentId) &&
+        request.resource.data.method == 'online' &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.amount <= 1000000 &&
+        request.resource.data.studentId is string &&
+        request.resource.data.feeRequestId is string &&
+        // Verify feeRequest belongs to this student
+        exists(/databases/$(database)/documents/feeRequests/$(request.resource.data.feeRequestId)) &&
+        get(/databases/$(database)/documents/feeRequests/$(request.resource.data.feeRequestId)).data.studentId == request.resource.data.studentId
+      ));
+      allow delete: if isAdmin();
+    }
+
+    match /feeRequests/{requestId} {
+      // Grievance officer can read (for follow-ups) but NOT create or update requests —
+      // payment requests are managed exclusively by the accounts team.
+      allow get: if isSignedIn() && (
+        isAdmin() || isAccountant() || isGrievanceOfficer() ||
+        isLinkedToStudent(resource.data.get('studentId', ''))
+      );
+      allow list: if isAdmin() || isAccountant() || isGrievanceOfficer() || isParent() || isStudent();
+      allow create: if isAdmin() || isAccountant();
+      allow update: if isAdmin() || isAccountant() || (
+        isLinkedToStudent(resource.data.studentId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paidAmount', 'status', 'updatedAt'])
+      );
+      allow delete: if isAdmin() || isAccountant();
+    }
+
+    // Advance payments — recorded by accountant (or parent online), consumed when
+    // a future monthly fee request is generated for a covered month.
+    match /advancePayments/{id} {
+      allow get: if isSignedIn() && (
+        isAdmin() || isAccountant() || isGrievanceOfficer() ||
+        isLinkedToStudent(resource.data.get('studentId', ''))
+      );
+      allow list: if isAdmin() || isAccountant() || isGrievanceOfficer() || isParent() || isStudent();
+      allow create: if isSignedIn() && (isAdmin() || isAccountant());
+      // Updates only mutate monthlyBreakdown / status as advance is consumed;
+      // the consumed flag is set by the same accountant or by the auto-apply flow.
+      allow update: if isSignedIn() && (isAdmin() || isAccountant());
+      allow delete: if isAdmin();
+    }
+
+    // Advance-payment intents — the parent/client writes one of these (keyed by
+    // the Razorpay order id) right before opening the checkout modal, so the
+    // server-side webhook can reconstruct and record the advance even if the app
+    // reloads or is backgrounded before the client callback fires. The webhook
+    // reads / updates / deletes these via the Admin/REST API, which bypasses
+    // these rules — so only the client create needs to be allowed here.
+    match /pendingAdvanceOrders/{orderId} {
+      allow create: if isSignedIn() && (
+        isAdmin() || isAccountant() || (
+          isParent() &&
+          request.resource.data.get('parentId', '') == request.auth.uid &&
+          isLinkedToStudent(request.resource.data.get('studentId', ''))
+        )
+      );
+      allow read: if isSignedIn() && (isAdmin() || isAccountant());
+      allow update, delete: if isAdmin();
+    }
+
+    // Broadcast logs — written by grievance officer / super admin after WhatsApp blasts
+    match /broadcastLogs/{id} {
+      allow read: if isAdmin() || isAccountant() || isGrievanceOfficer();
+      allow create: if isSignedIn() && (isAdmin() || isGrievanceOfficer());
+      allow delete: if isAdmin();
+    }
+
+    // Fee followup records — managed by grievance officer and accounts
+    match /feeFollowups/{id} {
+      allow read: if isAdmin() || isAccountant() || isGrievanceOfficer();
+      allow create, update: if isAdmin() || isAccountant() || isGrievanceOfficer();
+      allow delete: if isAdmin();
+    }
+
+    // Atomic counters (e.g. receipt number sequence)
+    match /counters/{id} {
+      allow read: if isAdmin() || isAccountant() || isGrievanceOfficer();
+      allow write: if isAdmin() || isAccountant() || isGrievanceOfficer();
+    }
+
+    // Activity logs — admins see all; students/parents/teachers/accounts can query their own feed
+    match /activityLogs/{id} {
+      allow get: if isAnyAdmin() || isAccountant();
+      allow list: if isAnyAdmin() || isTeacher() || isParent() || isStudent() || isAccountant();
+      allow create: if isSignedIn();
+      // Tamper-resistant: only the aiDescription field may be patched (used by the
+      // Gemini fire-and-forget enhancer). No other field can be modified after write.
+      allow update: if isSignedIn()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['aiDescription']);
+    }
+
+    // Helper collections
+    match /gradingScales/{id} { allow read: if isSignedIn(); allow write: if isAnyAdmin(); }
+
+    // Exams
+    // Read: any signed-in user (students/parents need this to see scheduled exams).
+    // Create: admins or teachers (any teacher can schedule for their classes).
+    // Update / delete: admins, or the teacher who created the exam.
+    match /exams/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isAnyAdmin() || isTeacher())
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 200
+                    && request.resource.data.maxMarks is number
+                    && request.resource.data.maxMarks > 0;
+      allow update, delete: if isSignedIn() && (
+        isAnyAdmin() ||
+        (isTeacher() && resource.data.get('createdBy', '') == request.auth.uid)
+      );
+    }
+    match /salaries/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin() || isAccountant(); }
+    match /expenses/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin() || isAccountant(); }
+    match /payroll-config/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin(); }
+    match /fine-config/{id} { allow read: if isAdmin() || isAccountant() || isParent() || isStudent(); allow write: if isAdmin(); }
+    match /settings/{id} { allow read: if request.auth != null; allow write: if isAdmin(); }
+    match /whatsappLogs/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin() || isAccountant(); }
+    match /feeStructures/{id} { allow read: if isSignedIn(); allow write: if isAnyAdmin(); }
+    match /feeHeads/{id} { allow read: if isSignedIn(); allow write: if isAnyAdmin(); }
+
+    // Study Materials
+    match /studyMaterials/{id} {
+      allow read: if isSignedIn();
+      allow create: if isAnyAdmin() || isTeacher();
+      allow update, delete: if isAnyAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // Student Leaves
+    match /studentLeaves/{leaveId} {
+      function isValidLeave(data) {
+        return data.studentId is string && data.studentId.size() <= 128 &&
+               data.parentId is string && data.parentId.size() <= 128 &&
+               data.studentName is string && data.studentName.size() <= 100 &&
+               data.classId is string && data.classId.size() <= 20 &&
+               (data.get('section', '') == '' || data.section is string) &&
+               data.leaveType in ["planned", "medical", "emergency", "half_day", "regularization"] &&
+               data.reasonCategory in ["Medical", "Family Function", "Travel", "Emergency", "Religious Reason", "Personal Reason", "Exam-related", "Other"] &&
+               data.reason is string && data.reason.size() <= 1000 &&
+               data.startDate is string &&
+               data.endDate is string &&
+               data.totalDays is number && data.totalDays > 0 && data.totalDays <= 30 &&
+               data.status in ["submitted", "pending", "approved", "rejected", "document_required", "regularized", "cancelled"] &&
+               data.isEmergency is bool &&
+               data.parentDeclaration is bool &&
+               data.get('attendanceConnectionStatus', 'pending') in ['pending', 'connected', 'failed'];
+      }
+
+      allow read: if isSignedIn() && (
+        isAnyAdmin() ||
+        isTeacher() ||
+        resource.data.parentId == request.auth.uid ||
+        resource.data.studentId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('studentId', '')
+      );
+
+      allow create: if isSignedIn() &&
+        (isLinkedToStudent(request.resource.data.studentId) || isAnyAdmin()) &&
+        isValidLeave(request.resource.data) &&
+        request.resource.data.status == 'submitted' &&
+        request.resource.data.parentId == request.auth.uid;
+
+      allow update: if isSignedIn() && (
+        (isAnyAdmin() &&
+         isValidLeave(request.resource.data) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'adminRemarks', 'updatedAt', 'processedBy', 'processedAt', 'attendanceConnectionStatus'])
+        ) ||
+        (resource.data.parentId == request.auth.uid &&
+         resource.data.status in ['submitted', 'pending'] &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+        (resource.data.parentId == request.auth.uid &&
+         resource.data.status == 'document_required' &&
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['documentUrl', 'documentName', 'status', 'updatedAt']) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['documentUrl', 'documentName', 'updatedAt']))
+        )
+      );
+
+      allow delete: if isSignedIn() && (
+        isAnyAdmin() ||
+        (resource.data.parentId == request.auth.uid && resource.data.status in ['submitted', 'pending'])
+      );
+    }
+
+    match /lessonLogs/{id} {
+      // Read: admins, principals, teachers (full). Students/parents only for their own class.
+      // Students rely on the `classId` field on their user doc (self-healed on login).
+      // Parents rely on `classIds` (also self-healed on login). If a parent's doc has not yet
+      // been migrated (no `classIds` set), fall back to allowing read so they aren't locked out
+      // mid-session; the next login will populate the field and enforcement will tighten.
+      allow read: if isSignedIn() && (
+        isAnyAdmin() || isTeacher() ||
+        (isStudent() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('classId', '') == resource.data.classId) ||
+        (isParent() && (
+          !('classIds' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) ||
+          resource.data.classId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classIds
+        ))
+      );
+      // List queries: only privileged readers can run unrestricted list. Students/parents must
+      // include their classId in a where() clause, which is enforced at the client and protected
+      // here by requiring the same auth conditions; an attacker without a matching classId
+      // simply gets denied per-doc on read.
+      allow list: if isSignedIn() && (isAnyAdmin() || isTeacher() || isStudent() || isParent());
+
+      allow create: if isSignedIn() && (isTeacher() || isAnyAdmin())
+                    && request.resource.data.topic is string && request.resource.data.topic.size() > 0
+                    && request.resource.data.topic.size() <= 300
+                    && request.resource.data.classwork.size() <= 8000
+                    && request.resource.data.homework.size() <= 8000;
+
+      // Update: admins always; teacher only for own logs; optimistic concurrency — version must strictly increment by 1
+      allow update: if isSignedIn() && (
+        isAnyAdmin() ||
+        (isTeacher() && resource.data.teacherId == request.auth.uid)
+      )
+      && request.resource.data.classId == resource.data.classId
+      && request.resource.data.teacherId == resource.data.teacherId
+      && request.resource.data.topic.size() <= 300
+      && request.resource.data.classwork.size() <= 8000
+      && request.resource.data.homework.size() <= 8000
+      && request.resource.data.get('version', 1) == resource.data.get('version', 0) + 1;
+
+      // Delete: admins or the owning teacher
+      allow delete: if isSignedIn() && (
+        isAnyAdmin() ||
+        (isTeacher() && resource.data.teacherId == request.auth.uid)
+      );
+    }
+
+    // Teacher Leave Requests
+    // Teachers can read/create their own; principal/admin can read all and update (approve/reject/revoke)
+    match /teacherLeaves/{leaveId} {
+      function isValidTeacherLeave(data) {
+        return data.teacherId is string && data.teacherId.size() <= 128 &&
+               data.teacherName is string && data.teacherName.size() <= 100 &&
+               data.leaveType in ['casual', 'medical', 'emergency', 'half_day', 'comp_off', 'earned'] &&
+               data.startDate is string &&
+               data.endDate is string &&
+               data.totalDays is number && data.totalDays > 0 && data.totalDays <= 365 &&
+               data.reason is string && data.reason.size() <= 2000 &&
+               data.status in ['pending', 'approved', 'rejected', 'cancelled'];
+      }
+
+      // Teachers read their own; principal/admin read all
+      allow get: if isSignedIn() && (
+        isPrincipal() || isAdmin() ||
+        (isTeacher() && resource.data.teacherId == request.auth.uid)
+      );
+      allow list: if isPrincipal() || isAdmin() || isTeacher();
+
+      // Teachers submit their own leaves (status must start as 'pending')
+      allow create: if isTeacher() &&
+        isValidTeacherLeave(request.resource.data) &&
+        request.resource.data.teacherId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() && (
+        // Principal/admin can approve, reject, revoke — update any approval fields
+        (isPrincipal() || isAdmin()) ||
+        // Teacher can only cancel their own pending leave
+        (isTeacher() &&
+         resource.data.teacherId == request.auth.uid &&
+         resource.data.status == 'pending' &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Substitute Assignments — created by principal on leave approval, read by teachers
+    match /substituteAssignments/{assignmentId} {
+      // Any signed-in teacher can read (they need to see if they are a substitute)
+      allow read: if isSignedIn() && (isTeacher() || isPrincipal() || isAdmin());
+      // Only principal/admin can create, update, or delete substitute assignments
+      allow create, update, delete: if isPrincipal() || isAdmin();
+    }
+
+    // Timetable Archive — written by admin during "Save as New Version"; readable by all staff
+    match /timetableArchive/{id} {
+      allow read: if isSignedIn() && (isAnyAdmin() || isTeacher());
+      allow create, update: if isAnyAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Attendance — extend existing rule to allow principal to write staff attendance
+    // (existing rule already covers this via isAnyAdmin(); no change needed there)
+
+    match /rolePermissions/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdminByEmail();
+    }
+
+    // Grievances — submitted by parents, managed by grievance officer / admin
+    match /grievances/{id} {
+      allow read: if isSignedIn() && (
+        isAdmin() || isGrievanceOfficer() || isPrincipal() ||
+        resource.data.get('parentId', '') == request.auth.uid
+      );
+      allow list: if isAdmin() || isGrievanceOfficer() || isPrincipal() || isParent();
+      allow create: if isSignedIn() && (isParent() || isAdmin() || isGrievanceOfficer());
+      allow update: if isSignedIn() && (isAdmin() || isGrievanceOfficer() || isPrincipal());
+      allow delete: if isAdmin();
+    }
+
+    // Extended Student Profiles — student fills, parent edits own section, admins full access
+    match /studentProfiles/{studentId} {
+      // Admins/principal/accounts can read all profiles (for analytics and management)
+      allow get: if isSignedIn() && (
+        isAnyAdmin() || isAccountant() ||
+        isLinkedToStudent(studentId)
+      );
+      allow list: if isAnyAdmin() || isAccountant();
+      // Student can write their own profile; parent can update their own section
+      allow create: if isSignedIn() && (
+        isAnyAdmin() ||
+        isLinkedToStudent(studentId)
+      );
+      allow update: if isSignedIn() && (
+        isAnyAdmin() ||
+        isLinkedToStudent(studentId)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Admission leads — admin portal only
+    match /admission_leads/{id} {      allow read: if isAnyAdmin();
+      allow create, update: if isAnyAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Notification center — broadcast notifications composed by admins/principal.
+    // Read by any signed-in user (client filters to the user's audience tokens),
+    // mirroring the existing /notices posture. Immutable once sent.
+    match /notifications/{id} {
+      allow read: if isSignedIn();
+      allow create: if isAnyAdmin()
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 200
+                    && request.resource.data.body is string
+                    && request.resource.data.body.size() <= 2000
+                    && request.resource.data.audience is list;
+      allow update: if false;
+      allow delete: if isAnyAdmin();
+    }
+
+    // Per-user notification state (read cursor + dismissed ids). Owner-only.
+    match /userNotificationState/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Safety fallback — deny everything not explicitly matched above
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "58420941278",
+    "project_id": "el-node-erp",
+    "storage_bucket": "el-node-erp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:58420941278:android:e22c5b52b1d1e310a14d4f",
+        "android_client_info": {
+          "package_name": "com.elnode.erp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "58420941278-vrsvc2k53trpjjab5esnk4r780kpe8b2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAahAq8dPy61Q7y4MVYkTrVsWvQIX2QsOs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "58420941278-vrsvc2k53trpjjab5esnk4r780kpe8b2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

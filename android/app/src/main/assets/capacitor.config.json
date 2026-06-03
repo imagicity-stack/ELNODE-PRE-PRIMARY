@@ -1,0 +1,16 @@
+{
+	"appId": "com.elnode.erp",
+	"appName": "EL-NODE",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"plugins": {
+		"LiveUpdates": {
+			"appId": "581cecb5",
+			"channel": "Production",
+			"autoUpdateMethod": "background",
+			"maxVersions": 3
+		}
+	}
+}

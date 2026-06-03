@@ -1,0 +1,5 @@
+{
+  "name": "EL-NODE",
+  "description": "A state-of-the-art ERP for The Elden Heights School, featuring multiple portals for Super Admin, Students, Parents, Accounts, and Teachers.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

@@ -1,0 +1,180 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      // In this environment, we might want to be careful with email_verified 
+      // if the provider doesn't strictly enforce it, but the mandate is clear.
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSuperAdminByEmail() {
+      return isSignedIn() && 
+             (request.auth.token.email.lower() == "imagicityart@gmail.com" || 
+              request.auth.token.email.lower() == "deweshkk@gmail.com");
+    }
+
+    // Helper to get user data from the users collection
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper to check if user has a role
+    function hasRole(role) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             getUserData().role == role;
+    }
+
+    function isAdmin() {
+      return isSuperAdminByEmail() || 
+             (isSignedIn() && 
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              getUserData().role in ['super_admin', 'principal', 'admin']);
+    }
+
+    function isTeacher() { return hasRole('teacher'); }
+    function isStudent() { return hasRole('student'); }
+    function isParent() { return hasRole('parent'); }
+    function isAccountant() { return hasRole('accounts'); }
+    function isPrincipal() { return hasRole('principal'); }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                    incoming().role == existing().role; // Users can't change their own role
+    }
+
+    // Classes, Subjects, Houses, Timetable, TimetableSettings
+    match /classes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /subjects/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /houses/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /timetable/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /timetableSettings/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Notices
+    match /notices/{noticeId} {
+      // Allow reading if the user is an admin OR if the notice targets their role
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         resource.data.targetRoles.hasAny([getUserData().role]))
+      );
+      allow write: if isAdmin();
+    }
+
+    // Students
+    match /students/{studentId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || isTeacher() || isAccountant() ||
+        (isStudent() && getUserData().studentId == studentId) ||
+        (isParent() && studentId in getUserData().studentIds)
+      );
+      allow write: if isAdmin();
+    }
+
+    // Teachers
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || isTeacher() || isAccountant() ||
+        (getUserData().teacherId == teacherId)
+      );
+      allow write: if isAdmin();
+    }
+
+    // Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || isTeacher() || isAccountant() ||
+        (isStudent() && resource.data.studentId == getUserData().studentId) ||
+        (isParent() && resource.data.studentId in getUserData().studentIds)
+      );
+      allow create, update: if isAdmin() || isTeacher() || isPrincipal();
+    }
+
+    // Exam Results
+    match /examResults/{resultId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || isTeacher() ||
+        (isStudent() && resource.data.studentId == getUserData().studentId) ||
+        (isParent() && resource.data.studentId in getUserData().studentIds)
+      );
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Homework
+    match /homework/{homeworkId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // Events, Fees
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /fees/{feeId} {
+      allow read: if isSignedIn() && (isAdmin() || isAccountant() || isParent() || isStudent());
+      allow write: if isAdmin() || isAccountant();
+    }
+    match /feePayments/{paymentId} {
+      allow read: if isSignedIn() && (isAdmin() || isAccountant());
+      allow create: if isAdmin() || isAccountant();
+    }
+    match /feeRequests/{requestId} {
+      allow read: if isSignedIn() && (isAdmin() || isAccountant() || isParent() || isStudent());
+      allow write: if isAdmin() || isAccountant();
+    }
+
+    // Fallback/Legacy items
+    match /gradingScales/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /exams/{id} { allow read: if isSignedIn(); allow write: if isAdmin() || isTeacher(); }
+    match /salaries/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin(); }
+    match /expenses/{id} { allow read: if isAdmin() || isAccountant(); allow write: if isAdmin() || isAccountant(); }
+  }
+}
